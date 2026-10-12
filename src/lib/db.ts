@@ -5,7 +5,9 @@ import type { Db, OrderInput, User } from "./types";
 import * as wf from "./workflow";
 
 // A tiny JSON-file "database" so state survives restarts and is shared between route handlers and pages.
-const FILE = path.join(process.cwd(), ".data", "db.json");
+// Vercel's project directory is read-only; only /tmp is writable (and per-instance, so data is a demo-grade snapshot).
+const FILE = process.env.VERCEL ? path.join("/tmp", "proa-db.json") : path.join(process.cwd(), ".data", "db.json");
+const mem = globalThis as unknown as { __proaDb?: Db };
 
 const USERS: User[] = [
   { id: "u-sales1", name: "Somchai (สมชาย)", role: "sales" },
@@ -199,6 +201,7 @@ export function loadDb(): Db {
   try {
     return migrate(JSON.parse(fs.readFileSync(FILE, "utf8")));
   } catch {
+    if (mem.__proaDb) return migrate(structuredClone(mem.__proaDb));
     const db = seed();
     saveDb(db);
     return db;
@@ -206,8 +209,13 @@ export function loadDb(): Db {
 }
 
 export function saveDb(db: Db) {
-  fs.mkdirSync(path.dirname(FILE), { recursive: true });
-  fs.writeFileSync(FILE, JSON.stringify(db, null, 2));
+  mem.__proaDb = structuredClone(db);
+  try {
+    fs.mkdirSync(path.dirname(FILE), { recursive: true });
+    fs.writeFileSync(FILE, JSON.stringify(db, null, 2));
+  } catch {
+    // read-only filesystem: the in-memory copy above is used instead
+  }
 }
 
 export function resetDb() {
