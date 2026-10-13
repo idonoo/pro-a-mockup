@@ -216,42 +216,60 @@ export function decidePriceChange(db: Db, user: User, id: string, approve: boole
 }
 
 /** Warehouse books goods in — no price. The cost is looked up from the standard price in force on the receipt date. */
-export function receiveMaterial(
+export interface ReceiptLine {
+  material: MaterialKey;
+  qty: number;
+  unit: string;
+  lot: string;
+}
+
+/** Warehouse: one receipt document = header (date, PO, supplier) + many material lines. All lines are booked together or not at all. */
+export function receiveGoods(
   db: Db,
   user: User,
-  p: { material: MaterialKey; qty: number; unit: string; date: string; poNo: string; supplierId: string; lot: string },
+  p: { date: string; poNo: string; supplierId: string; lines: ReceiptLine[] },
 ): Result {
   if (!needRole(user, "store")) return fail("err.forbidden");
-  const m = db.materials.find((x) => x.key === p.material);
-  if (!m) return fail("err.material");
   const sup = db.suppliers.find((x) => x.id === p.supplierId);
   if (!sup) return fail("err.supplier");
-  if (!(p.qty > 0)) return fail("err.qty");
-  const alt = m.altUnit && (p.unit === m.altUnit.th || p.unit === m.altUnit.en) ? m.altUnit : undefined;
-  if (!alt && p.unit !== m.unit) return fail("err.unit");
-  const qtyBase = r2(alt ? p.qty * alt.factor : p.qty);
+  if (!p.lines?.length) return fail("err.noLines");
   const date = p.date || today();
-  const price = activePrice(db, p.material, p.supplierId, date);
-  if (price) m.avgPrice = m.onHand > 0 ? r2((m.onHand * m.avgPrice + qtyBase * price.newPrice) / (m.onHand + qtyBase)) : price.newPrice; // moving average (TBC)
-  m.onHand = r2(m.onHand + qtyBase);
-  db.receipts.unshift({
-    id: `RC-${String(db.receipts.length + 1).padStart(4, "0")}`,
-    at: now(),
-    by: user.name,
-    date,
-    material: p.material,
-    qtyKg: qtyBase,
-    enteredQty: p.qty,
-    enteredUnit: p.unit,
-    poNo: p.poNo?.trim() ?? "",
-    supplierId: sup.id,
-    supplier: sup.name,
-    lot: p.lot?.trim() ?? "",
-    cost: price?.newPrice,
-    priceId: price?.id,
-  });
+  const parsed: { m: Material; line: ReceiptLine; qtyBase: number }[] = [];
+  for (const line of p.lines) {
+    const m = db.materials.find((x) => x.key === line.material);
+    if (!m) return fail("err.material");
+    if (!(line.qty > 0)) return fail("err.qty");
+    const alt = m.altUnit && (line.unit === m.altUnit.th || line.unit === m.altUnit.en) ? m.altUnit : undefined;
+    if (!alt && line.unit !== m.unit) return fail("err.unit");
+    parsed.push({ m, line, qtyBase: r2(alt ? line.qty * alt.factor : line.qty) });
+  }
+  const docNo = db.receipts.reduce((mx, r) => Math.max(mx, Number(/^GR-(\d+)$/.exec(r.docId)?.[1] ?? 0)), 0) + 1;
+  const docId = `GR-${String(docNo).padStart(4, "0")}`;
+  const poNo = p.poNo?.trim() ?? "";
+  for (const { m, line, qtyBase } of parsed) {
+    const price = activePrice(db, m.key, sup.id, date);
+    if (price) m.avgPrice = m.onHand > 0 ? r2((m.onHand * m.avgPrice + qtyBase * price.newPrice) / (m.onHand + qtyBase)) : price.newPrice; // moving average (TBC)
+    m.onHand = r2(m.onHand + qtyBase);
+    db.receipts.unshift({
+      id: `RC-${String(db.receipts.length + 1).padStart(4, "0")}`,
+      docId,
+      at: now(),
+      by: user.name,
+      date,
+      material: m.key,
+      qtyKg: qtyBase,
+      enteredQty: line.qty,
+      enteredUnit: line.unit,
+      poNo,
+      supplierId: sup.id,
+      supplier: sup.name,
+      lot: line.lot?.trim() ?? "",
+      cost: price?.newPrice,
+      priceId: price?.id,
+    });
+  }
   recheckWaiting(db);
-  return ok();
+  return ok(docId);
 }
 
 export function issueMaterial(db: Db, user: User, id: string, issueId: string): Result {

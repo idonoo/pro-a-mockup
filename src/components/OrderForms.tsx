@@ -120,76 +120,121 @@ export function FgForm({ orderId, pieces }: { orderId: string; pieces: number })
 
 export type MaterialOption = { key: string; name: string; unit: string; alt?: { name: string; factor: number } };
 
-/** Warehouse: goods receipt without any price. Purchasing adds the cost later. */
+type RcRow = { key: number; material: string; qty: string; unit: string; lot: string };
+
+/** Warehouse: one receipt document — header (date, PO, supplier) once, then one row per material. No prices here. */
 export function ReceiveMaterialForm({ materials, suppliers }: { materials: MaterialOption[]; suppliers: { id: string; name: string }[] }) {
   const t = useT();
   const run = useRun();
   const today = new Date().toISOString().slice(0, 10);
-  const [material, setMaterial] = useState(materials[0].key);
-  const [qty, setQty] = useState("");
-  const cur = materials.find((m) => m.key === material)!;
-  const [unit, setUnit] = useState(cur.unit);
+  const newRow = (key: number): RcRow => ({ key, material: materials[0].key, qty: "", unit: materials[0].unit, lot: "" });
   const [date, setDate] = useState(today);
   const [poNo, setPoNo] = useState("");
   const [supplierId, setSupplierId] = useState("");
-  const [lot, setLot] = useState("");
-  const pick = (k: string) => {
-    setMaterial(k);
-    setUnit(materials.find((m) => m.key === k)!.unit);
+  const [rows, setRows] = useState<RcRow[]>([newRow(1)]);
+  const [seq, setSeq] = useState(2);
+  const [added, setAdded] = useState(false);
+  const mat = (k: string) => materials.find((m) => m.key === k)!;
+  const patch = (key: number, p: Partial<RcRow>) => setRows((rs) => rs.map((r) => (r.key === key ? { ...r, ...p } : r)));
+  const pick = (key: number, k: string) => patch(key, { material: k, unit: mat(k).unit });
+  const addRow = () => {
+    setRows((rs) => [...rs, newRow(seq)]);
+    setSeq(seq + 1);
+    setAdded(true);
+    setTimeout(() => setAdded(false), 1500);
   };
-  const conv = unit !== cur.unit && cur.alt ? ` (= ${fmt(Number(qty || 0) * cur.alt.factor)} ${cur.unit})` : "";
+  const lineText = (r: RcRow) => {
+    const m = mat(r.material);
+    const conv = r.unit !== m.unit && m.alt ? ` (= ${fmt(Number(r.qty || 0) * m.alt.factor)} ${m.unit})` : "";
+    return `${m.name}: ${fmt(Number(r.qty) || 0)} ${r.unit}${conv}${r.lot ? ` · ${t("rc.lot")} ${r.lot}` : ""}`;
+  };
+  const ready = !!supplierId && rows.length > 0 && rows.every((r) => Number(r.qty) > 0);
   return (
-    <div className="grid gap-5 md:grid-cols-3">
-      <div>
-        <label className="label">{t("rc.material")}</label>
-        <select className="input" value={material} onChange={(e) => pick(e.target.value)}>
-          {materials.map((m) => (
-            <option key={m.key} value={m.key}>{m.name}</option>
-          ))}
-        </select>
+    <div className="flex flex-col gap-5">
+      <div className="grid gap-5 md:grid-cols-3">
+        <div>
+          <label className="label">{t("rc.date")}</label>
+          <input className="input" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+        </div>
+        <div>
+          <label className="label">{t("rc.poNo")}</label>
+          <input className="input" value={poNo} onChange={(e) => setPoNo(e.target.value)} />
+        </div>
+        <div>
+          <label className="label">{t("rc.supplier")}</label>
+          <select className="input" value={supplierId} onChange={(e) => setSupplierId(e.target.value)}>
+            <option value="">{t("rc.pickSupplier")}</option>
+            {suppliers.map((x) => (
+              <option key={x.id} value={x.id}>{x.name}</option>
+            ))}
+          </select>
+        </div>
       </div>
+
       <div>
-        <label className="label">{t("rc.qty")}</label>
-        <input className="input" type="number" min={0} step="any" value={qty} onChange={(e) => setQty(e.target.value)} />
+        <h3 className="mb-2 text-lg font-bold">{t("rc.items")} ({rows.length})</h3>
+        <div className="flex flex-col gap-3">
+          {rows.map((r, i) => {
+            const m = mat(r.material);
+            return (
+              <div key={r.key} className="grid items-end gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 md:grid-cols-[2rem_2fr_1fr_1fr_1fr_auto]">
+                <div className="pb-3 text-center font-bold text-slate-500">{i + 1}</div>
+                <div>
+                  <label className="label">{t("rc.material")}</label>
+                  <select className="input" value={r.material} onChange={(e) => pick(r.key, e.target.value)}>
+                    {materials.map((x) => (
+                      <option key={x.key} value={x.key}>{x.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="label">{t("rc.qty")}</label>
+                  <input className="input" type="number" min={0} step="any" value={r.qty} onChange={(e) => patch(r.key, { qty: e.target.value })} />
+                </div>
+                <div>
+                  <label className="label">{t("rc.unit")}</label>
+                  <select className="input" value={r.unit} onChange={(e) => patch(r.key, { unit: e.target.value })}>
+                    <option value={m.unit}>{m.unit}</option>
+                    {m.alt && <option value={m.alt.name}>{m.alt.name} (1 = {fmt(m.alt.factor)} {m.unit})</option>}
+                  </select>
+                </div>
+                <div>
+                  <label className="label">{t("rc.lot")}</label>
+                  <input className="input" value={r.lot} onChange={(e) => patch(r.key, { lot: e.target.value })} />
+                </div>
+                <button type="button" className="btn btn-ghost mb-0.5" disabled={rows.length === 1} onClick={() => setRows((rs) => rs.filter((x) => x.key !== r.key))} aria-label={t("rc.removeRow")}>
+                  ✕
+                </button>
+              </div>
+            );
+          })}
+        </div>
+        <div className="mt-3 flex items-center gap-3">
+          <button type="button" className="btn btn-ghost" onClick={addRow}>+ {t("rc.addRow")}</button>
+          {added && <span className="font-semibold text-emerald-700">✓ {t("rc.rowAdded")}</span>}
+        </div>
       </div>
+
       <div>
-        <label className="label">{t("rc.unit")}</label>
-        <select className="input" value={unit} onChange={(e) => setUnit(e.target.value)}>
-          <option value={cur.unit}>{cur.unit}</option>
-          {cur.alt && <option value={cur.alt.name}>{cur.alt.name} (1 = {fmt(cur.alt.factor)} {cur.unit})</option>}
-        </select>
-      </div>
-      <div>
-        <label className="label">{t("rc.date")}</label>
-        <input className="input" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-      </div>
-      <div>
-        <label className="label">{t("rc.poNo")}</label>
-        <input className="input" value={poNo} onChange={(e) => setPoNo(e.target.value)} />
-      </div>
-      <div>
-        <label className="label">{t("rc.supplier")}</label>
-        <select className="input" value={supplierId} onChange={(e) => setSupplierId(e.target.value)}>
-          <option value="">{t("rc.pickSupplier")}</option>
-          {suppliers.map((x) => (
-            <option key={x.id} value={x.id}>{x.name}</option>
-          ))}
-        </select>
-      </div>
-      <div>
-        <label className="label">{t("rc.lot")}</label>
-        <input className="input" value={lot} onChange={(e) => setLot(e.target.value)} />
-      </div>
-      <div className="md:col-span-3">
         <ConfirmButton
           label={t("act.receiveMaterial")}
           variant="green"
+          disabled={!ready}
           spec={{
             title: t("confirm.receive"),
-            lines: [`${cur.name}: ${fmt(Number(qty) || 0)} ${unit}${conv}`, `${t("rc.date")}: ${date}`, `${t("rc.poNo")}: ${poNo || "—"}`, `${t("rc.supplier")}: ${suppliers.find((x) => x.id === supplierId)?.name ?? "—"} · ${t("rc.lot")}: ${lot || "—"}`],
+            lines: [
+              `${t("rc.date")}: ${date} · ${t("rc.poNo")}: ${poNo || "—"}`,
+              `${t("rc.supplier")}: ${suppliers.find((x) => x.id === supplierId)?.name ?? "—"}`,
+              ...rows.map((r, i) => `${i + 1}. ${lineText(r)}`),
+            ],
           }}
-          run={run("/api/materials/receive", { material, qty: Number(qty), unit, date, poNo, supplierId, lot }, { after: () => { setQty(""); setLot(""); setPoNo(""); } })}
+          run={run(
+            "/api/materials/receive",
+            { date, poNo, supplierId, lines: rows.map((r) => ({ material: r.material, qty: Number(r.qty), unit: r.unit, lot: r.lot })) },
+            { after: () => { setRows([newRow(seq)]); setSeq(seq + 1); setPoNo(""); } },
+          )}
         />
+        {!ready && <span className="ml-3 text-base text-slate-500">{t("rc.needFields")}</span>}
       </div>
     </div>
   );

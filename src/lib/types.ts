@@ -43,7 +43,8 @@ export interface Material {
 
 /** Warehouse books the receipt without a price; the cost comes from the standard price table (see PriceChange). */
 export interface Receipt {
-  id: string;
+  id: string; // line id (RC-…)
+  docId: string; // receipt document (GR-…): one document = one PO with many lines
   at: string;
   by: string;
   date: string; // date received

@@ -3,7 +3,7 @@ import { ReceiveMaterialForm } from "@/components/OrderForms";
 import { PageHeader } from "@/components/ui";
 import { r2 } from "@/lib/calc";
 import { loadDb } from "@/lib/db";
-import { fdate, fmt, makeT, matName, unitOf } from "@/lib/i18n-core";
+import { fdate, fdt, fmt, makeT, matName, unitOf } from "@/lib/i18n-core";
 import { BOM_KEYS } from "@/lib/master";
 import { canSeeUnitCost, getLang, requireUser } from "@/lib/session";
 
@@ -14,6 +14,14 @@ export default async function Store() {
   const showCost = canSeeUnitCost(user.role); // the warehouse never sees prices
   const waiting = db.orders.filter((o) => o.status === "waiting_material");
   const shortage = Object.fromEntries(BOM_KEYS.map((k) => [k, r2(waiting.reduce((s, o) => s + (o.shortage?.[k] ?? 0), 0))]));
+  // receipts are booked as documents (one PO, many lines) — newest first
+  const docMap = new Map<string, { id: string; date: string; poNo: string; supplier: string; by: string; at: string; lines: typeof db.receipts }>();
+  for (const r of db.receipts) {
+    const d = docMap.get(r.docId) ?? { id: r.docId, date: r.date, poNo: r.poNo, supplier: r.supplier, by: r.by, at: r.at, lines: [] };
+    d.lines.unshift(r);
+    docMap.set(r.docId, d);
+  }
+  const docs = [...docMap.values()].slice(0, 15);
   const anyShort = BOM_KEYS.some((k) => shortage[k] > 0);
 
   return (
@@ -82,39 +90,50 @@ export default async function Store() {
         </section>
       )}
 
-      <section className="card overflow-x-auto">
-        <h2 className="mb-3 text-2xl font-bold">{t("rc.log")}</h2>
-        <table className="w-full">
-          <thead>
-            <tr>
-              <th className="th">{t("rc.id")}</th>
-              <th className="th">{t("rc.date")}</th>
-              <th className="th">{t("rc.material")}</th>
-              <th className="th text-right">{t("rc.qty")}</th>
-              <th className="th text-right">{t("rc.baseQty")}</th>
-              <th className="th">{t("rc.poNo")}</th>
-              <th className="th">{t("rc.supplier")}</th>
-              <th className="th">{t("rc.lot")}</th>
-              {showCost && <th className="th text-right">{t("cost.cost")}</th>}
-            </tr>
-          </thead>
-          <tbody>
-            {db.receipts.slice(0, 15).map((r) => (
-              <tr key={r.id}>
-                <td className="td font-semibold">{r.id}</td>
-                <td className="td whitespace-nowrap">{fdate(r.date)}</td>
-                <td className="td">{matName(t, r.material, db.materials)}</td>
-                <td className="td text-right">{fmt(r.enteredQty)} {r.enteredUnit}</td>
-                <td className="td text-right">{fmt(r.qtyKg)} {unitOf(r.material, db.materials)}</td>
-                <td className="td">{r.poNo || "—"}</td>
-                <td className="td">{r.supplier || "—"}</td>
-                <td className="td">{r.lot || "—"}</td>
-                {showCost && <td className="td text-right">{r.cost === undefined ? <span className="text-amber-700">{t("cost.noStd")}</span> : fmt(r.cost)}</td>}
-              </tr>
-            ))}
-            {db.receipts.length === 0 && <tr><td className="td text-center text-slate-500" colSpan={9}>{t("empty")}</td></tr>}
-          </tbody>
-        </table>
+      <section className="card">
+        <h2 className="mb-3 text-2xl font-bold">{t("rc.docs")}</h2>
+        <div className="flex flex-col gap-3">
+          {docs.map((d, i) => (
+            <details key={d.id} className="rounded-xl border border-slate-200 bg-white" open={i === 0}>
+              <summary className="flex cursor-pointer flex-wrap items-center gap-x-6 gap-y-1 px-4 py-3 text-lg">
+                <span className="font-bold">{d.id}</span>
+                <span className="whitespace-nowrap">{fdate(d.date)}</span>
+                <span>{t("rc.poNo")}: <b>{d.poNo || "—"}</b></span>
+                <span>{d.supplier || "—"}</span>
+                <span className="rounded-full bg-slate-200 px-3 py-0.5 text-base font-semibold">{d.lines.length} {t("rc.lines")}</span>
+                {showCost && d.lines.some((r) => r.cost === undefined) && <span className="text-base font-semibold text-amber-700">{t("cost.noStd")}</span>}
+              </summary>
+              <div className="overflow-x-auto border-t border-slate-200 px-4 pb-3">
+                <table className="w-full">
+                  <thead>
+                    <tr>
+                      <th className="th">{t("rc.id")}</th>
+                      <th className="th">{t("rc.material")}</th>
+                      <th className="th text-right">{t("rc.qty")}</th>
+                      <th className="th text-right">{t("rc.baseQty")}</th>
+                      <th className="th">{t("rc.lot")}</th>
+                      {showCost && <th className="th text-right">{t("cost.cost")}</th>}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {d.lines.map((r) => (
+                      <tr key={r.id}>
+                        <td className="td font-semibold">{r.id}</td>
+                        <td className="td">{matName(t, r.material, db.materials)}</td>
+                        <td className="td text-right">{fmt(r.enteredQty)} {r.enteredUnit}</td>
+                        <td className="td text-right">{fmt(r.qtyKg)} {unitOf(r.material, db.materials)}</td>
+                        <td className="td">{r.lot || "—"}</td>
+                        {showCost && <td className="td text-right">{r.cost === undefined ? <span className="text-amber-700">{t("cost.noStd")}</span> : fmt(r.cost)}</td>}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <p className="mt-2 text-sm text-slate-500">{d.by} · {fdt(d.at)}</p>
+              </div>
+            </details>
+          ))}
+          {docs.length === 0 && <p className="text-center text-slate-500">{t("empty")}</p>}
+        </div>
       </section>
     </>
   );

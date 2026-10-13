@@ -126,10 +126,11 @@ function seed(): Db {
   const day = today.toISOString().slice(0, 10);
   const std: [string, string, number][] = [["steel", "s1", 30], ["glue", "s2", 80], ["pe", "s3", 45], ["moisture", "s4", 60], ["masterbatch", "s4", 120]];
   for (const [material, supplierId, price] of std) wf.setStdPrice(db, pu, { material, supplierId, price });
-  wf.receiveMaterial(db, st, { material: "steel", qty: 500, unit: "kg", date: day, poNo: "PO-S-2401", supplierId: "s1", lot: "L-2410-01" });
-  wf.receiveMaterial(db, st, { material: "glue", qty: 40, unit: "ถุง", date: day, poNo: "PO-G-2402", supplierId: "s2", lot: "L-2410-02" });
-  wf.receiveMaterial(db, st, { material: "pe", qty: 2000, unit: "kg", date: day, poNo: "PO-P-2403", supplierId: "s3", lot: "L-2410-03" });
-  wf.receiveMaterial(db, st, { material: "steel", qty: 200, unit: "kg", date: day, poNo: "PO-S-2404", supplierId: "s5", lot: "L-2410-04" }); // supplier without a standard price yet
+  wf.receiveGoods(db, st, { date: day, poNo: "PO-S-2401", supplierId: "s1", lines: [{ material: "steel", qty: 500, unit: "kg", lot: "L-2410-01" }] });
+  wf.receiveGoods(db, st, { date: day, poNo: "PO-G-2402", supplierId: "s2", lines: [{ material: "glue", qty: 40, unit: "ถุง", lot: "L-2410-02" }] });
+  wf.receiveGoods(db, st, { date: day, poNo: "PO-P-2403", supplierId: "s3", lines: [{ material: "pe", qty: 2000, unit: "kg", lot: "L-2410-03" }] });
+  wf.receiveGoods(db, st, { date: day, poNo: "PO-S-2404", supplierId: "s5", lines: [{ material: "steel", qty: 200, unit: "kg", lot: "L-2410-04" }] }); // supplier without a standard price yet
+  wf.receiveGoods(db, st, { date: day, poNo: "PO-M-2405", supplierId: "s4", lines: [{ material: "moisture", qty: 300, unit: "kg", lot: "L-2410-05" }, { material: "masterbatch", qty: 300, unit: "kg", lot: "L-2410-06" }] }); // one PO, two materials
   wf.setStdPrice(db, pu, { material: "steel", supplierId: "s1", price: 32 }); // price rise, waiting for the executive
 
   // daily scrap (production)
@@ -149,6 +150,7 @@ function migrate(db: any): Db {
   db.suppliers ??= [];
   db.dailyScrap ??= [];
   db.masterLog ??= [];
+  for (const r of db.receipts ?? []) r.docId ??= r.id.replace(/^RC-/, "GR-"); // receipts booked one by one before multi-line documents
   db.master ??= defaultMaster();
   if (!db.users.some((u: User) => u.role === "purchasing")) db.users.splice(5, 0, USERS.find((u) => u.role === "purchasing")!);
   for (const m of db.materials) {
