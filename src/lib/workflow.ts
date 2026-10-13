@@ -215,7 +215,6 @@ export function decidePriceChange(db: Db, user: User, id: string, approve: boole
   return ok();
 }
 
-/** Warehouse books goods in — no price. The cost is looked up from the standard price in force on the receipt date. */
 export interface ReceiptLine {
   material: MaterialKey;
   qty: number;
@@ -223,7 +222,8 @@ export interface ReceiptLine {
   lot: string;
 }
 
-/** Warehouse: one receipt document = header (date, PO, supplier) + many material lines. All lines are booked together or not at all. */
+/** Warehouse books goods in — no price; each line's cost is the standard price in force on the receipt date.
+ *  One receipt document = header (date, PO, supplier) + many material lines. All lines are booked together or not at all. */
 export function receiveGoods(
   db: Db,
   user: User,
