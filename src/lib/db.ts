@@ -197,18 +197,46 @@ function migrate(db: any): Db {
   return db as Db;
 }
 
-export function loadDb(): Db {
+// Shared store (Upstash Redis via Vercel Marketplace) so every serverless instance sees the same data.
+const REDIS_URL = process.env.KV_REST_API_URL ?? process.env.UPSTASH_REDIS_REST_URL;
+const REDIS_TOKEN = process.env.KV_REST_API_TOKEN ?? process.env.UPSTASH_REDIS_REST_TOKEN;
+const KEY = "proa:db";
+
+async function redis(cmd: unknown[]): Promise<unknown> {
+  const r = await fetch(REDIS_URL!, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${REDIS_TOKEN}`, "Content-Type": "application/json" },
+    body: JSON.stringify(cmd),
+    cache: "no-store",
+  });
+  const j = (await r.json()) as { result?: unknown; error?: string };
+  if (!r.ok || j.error) throw new Error(`redis: ${j.error ?? r.status}`);
+  return j.result;
+}
+
+export async function loadDb(): Promise<Db> {
+  if (REDIS_URL && REDIS_TOKEN) {
+    const raw = (await redis(["GET", KEY])) as string | null;
+    if (raw) return migrate(JSON.parse(raw));
+    const db = seed();
+    await saveDb(db);
+    return db;
+  }
   try {
     return migrate(JSON.parse(fs.readFileSync(FILE, "utf8")));
   } catch {
     if (mem.__proaDb) return migrate(structuredClone(mem.__proaDb));
     const db = seed();
-    saveDb(db);
+    await saveDb(db);
     return db;
   }
 }
 
-export function saveDb(db: Db) {
+export async function saveDb(db: Db) {
+  if (REDIS_URL && REDIS_TOKEN) {
+    await redis(["SET", KEY, JSON.stringify(db)]);
+    return;
+  }
   mem.__proaDb = structuredClone(db);
   try {
     fs.mkdirSync(path.dirname(FILE), { recursive: true });
@@ -218,13 +246,13 @@ export function saveDb(db: Db) {
   }
 }
 
-export function resetDb() {
-  saveDb(seed());
+export async function resetDb() {
+  await saveDb(seed());
 }
 
-export function mutate<T>(fn: (db: Db) => T): T {
-  const db = loadDb();
+export async function mutate<T>(fn: (db: Db) => T): Promise<T> {
+  const db = await loadDb();
   const r = fn(db);
-  saveDb(db);
+  await saveDb(db);
   return r;
 }

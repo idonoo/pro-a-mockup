@@ -7,7 +7,7 @@ import { getLang, requireUser } from "@/lib/session";
 export default async function ManageMaterials() {
   await requireUser("store");
   const t = makeT(await getLang());
-  const db = loadDb();
+  const db = (await loadDb());
   return (
     <>
       <PageHeader title={t("nav.materials")} sub={t("mm.storeHint")} />

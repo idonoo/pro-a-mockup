@@ -7,7 +7,7 @@ import { getLang, requireUser } from "@/lib/session";
 export default async function Approvals() {
   await requireUser("approver");
   const t = makeT(await getLang());
-  const db = loadDb();
+  const db = (await loadDb());
   const pending = db.orders.filter((o) => o.status === "pending_approval");
   const issues = db.orders.flatMap((o) => o.issues.filter((i) => i.approval === "pending" && i.status === "requested").map((i) => ({ o, i })));
   const seller = (id: string) => db.users.find((u) => u.id === id)?.name ?? "";

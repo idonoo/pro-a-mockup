@@ -7,5 +7,5 @@ export async function POST(req: Request) {
   const user = await apiUser();
   if (!user) return unauthorized();
   const input = (await req.json()) as OrderInput;
-  return json(mutate((db) => createOrder(db, user, input)), 201);
+  return json(await mutate((db) => createOrder(db, user, input)), 201);
 }

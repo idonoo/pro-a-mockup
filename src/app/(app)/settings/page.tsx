@@ -9,7 +9,7 @@ import { getLang, requireUser } from "@/lib/session";
 export default async function SettingsPage() {
   await requireUser("exec");
   const t = makeT(await getLang());
-  const db = loadDb();
+  const db = (await loadDb());
   return (
     <>
       <PageHeader title={t("nav.settings")} />

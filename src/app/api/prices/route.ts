@@ -8,7 +8,7 @@ export async function POST(req: Request) {
   if (!user) return unauthorized();
   const b = await req.json();
   return json(
-    mutate((db): wf.Result => {
+    await mutate((db): wf.Result => {
       switch (b.action) {
         case "set":
           return wf.setStdPrice(db, user, { material: String(b.material), supplierId: String(b.supplierId), price: Number(b.price) });

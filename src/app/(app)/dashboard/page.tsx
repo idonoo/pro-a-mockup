@@ -16,7 +16,7 @@ const BAR: Record<OrderStatus, string> = {
 export default async function Dashboard() {
   await requireUser("exec");
   const t = makeT(await getLang());
-  const db = loadDb();
+  const db = (await loadDb());
   const counted = db.orders.filter((o) => !["pending_approval", "rejected"].includes(o.status));
   const fins = counted.map((o) => financials(o, db.settings));
   const sum = (f: (x: ReturnType<typeof financials>) => number) => r2(fins.reduce((s, x) => s + f(x), 0));

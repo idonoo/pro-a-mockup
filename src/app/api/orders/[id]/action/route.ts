@@ -7,7 +7,7 @@ export async function POST(req: Request, ctx: RouteContext<"/api/orders/[id]/act
   if (!user) return unauthorized();
   const { id } = await ctx.params;
   const b = await req.json();
-  const result = mutate((db): wf.Result => {
+  const result = await mutate((db): wf.Result => {
     switch (b.action) {
       case "approve":
         return wf.approveOrder(db, user, id);

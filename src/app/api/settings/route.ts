@@ -6,7 +6,7 @@ export async function PUT(req: Request) {
   if (!user) return unauthorized();
   if (user.role !== "exec") return json({ ok: false, errors: ["err.forbidden"] });
   const b = await req.json();
-  mutate((db) => {
+  await mutate((db) => {
     db.settings = {
       commissionBase: b.commissionBase === "net" ? "net" : "sales",
       rateSales: Math.max(0, Number(b.rateSales) || 0),

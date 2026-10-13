@@ -15,7 +15,7 @@ const COLS: { status: OrderStatus; hint: string }[] = [
 export default async function Production() {
   await requireUser("production");
   const t = makeT(await getLang());
-  const db = loadDb();
+  const db = (await loadDb());
   return (
     <>
       <PageHeader title={t("nav.production")} sub={t("prod.sub")} />

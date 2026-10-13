@@ -11,7 +11,7 @@ import { activePrice, currentStandard } from "@/lib/workflow";
 export default async function Purchasing() {
   await requireUser("purchasing");
   const t = makeT(await getLang());
-  const db = loadDb();
+  const db = (await loadDb());
   const today = new Date().toISOString().slice(0, 10);
   const sup = (id?: string) => db.suppliers.find((x) => x.id === id)?.name ?? "—";
 

@@ -5,6 +5,6 @@ export async function POST() {
   const user = await apiUser();
   if (!user) return unauthorized();
   if (user.role !== "exec") return json({ ok: false, errors: ["err.forbidden"] });
-  resetDb();
+  await resetDb();
   return json({ ok: true });
 }

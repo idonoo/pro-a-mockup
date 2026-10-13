@@ -28,7 +28,7 @@ export default async function OrderDetail({ params }: PageProps<"/orders/[id]">)
   const user = await requireUser();
   const { id } = await params;
   const t = makeT(await getLang());
-  const db = loadDb();
+  const db = (await loadDb());
   const o = db.orders.find((x) => x.id === id);
   if (!o) notFound();
   const role = user.role;

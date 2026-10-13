@@ -7,7 +7,7 @@ export async function POST(req: Request) {
   if (!user) return unauthorized();
   const b = await req.json();
   return json(
-    mutate((db) =>
+    await mutate((db) =>
       receiveMaterial(db, user, {
         material: String(b.material),
         qty: Number(b.qty),

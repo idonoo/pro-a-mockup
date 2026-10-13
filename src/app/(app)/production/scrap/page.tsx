@@ -7,7 +7,7 @@ import { getLang, requireUser } from "@/lib/session";
 export default async function ScrapPage() {
   await requireUser("production");
   const t = makeT(await getLang());
-  const db = loadDb();
+  const db = (await loadDb());
   const day = (o: (typeof db.orders)[number], action: string) => o.history.find((h) => h.action === action)?.at.slice(0, 10);
   const orders = db.orders
     .filter((o) => day(o, "h.started"))

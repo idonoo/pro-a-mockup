@@ -11,7 +11,7 @@ const STATUSES: OrderStatus[] = ["pending_approval", "rejected", "waiting_materi
 export default async function OrdersPage({ searchParams }: PageProps<"/orders">) {
   const user = await requireUser("sales", "approver", "exec");
   const t = makeT(await getLang());
-  const db = loadDb();
+  const db = (await loadDb());
   const sp = await searchParams;
   const filter = typeof sp.status === "string" ? sp.status : "";
   const mine = user.role === "sales";

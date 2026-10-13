@@ -9,5 +9,5 @@ export async function PUT(req: Request) {
   const b = await req.json();
   const spec = b.spec === "innovation" ? "innovation" : "tis";
   const rows = (b.rows ?? []).map((r: { diameter: number; steel: number; pe: number }) => ({ diameter: Number(r.diameter), steel: Number(r.steel), pe: Number(r.pe) }));
-  return json(mutate((db) => updateMaster(db, user, spec, rows)));
+  return json(await mutate((db) => updateMaster(db, user, spec, rows)));
 }

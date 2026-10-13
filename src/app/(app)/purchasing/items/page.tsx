@@ -7,7 +7,7 @@ import { getLang, requireUser } from "@/lib/session";
 export default async function Items() {
   await requireUser("purchasing");
   const t = makeT(await getLang());
-  const db = loadDb();
+  const db = (await loadDb());
   return (
     <>
       <PageHeader title={t("nav.items")} sub={t("items.sub")} />

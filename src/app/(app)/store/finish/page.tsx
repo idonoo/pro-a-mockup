@@ -8,7 +8,7 @@ import { getLang, requireUser } from "@/lib/session";
 export default async function Finish() {
   await requireUser("store");
   const t = makeT(await getLang());
-  const db = loadDb();
+  const db = (await loadDb());
   const list = db.orders.filter((o) => o.status === "qc_done");
   const fg = db.orders.filter((o) => o.fg);
   return (

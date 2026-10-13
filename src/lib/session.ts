@@ -11,7 +11,7 @@ export async function getLang(): Promise<Lang> {
 export async function getUserOrNull(): Promise<User | null> {
   const c = await cookies();
   const id = c.get("uid")?.value;
-  return id ? (loadDb().users.find((u) => u.id === id) ?? null) : null;
+  return id ? ((await loadDb()).users.find((u) => u.id === id) ?? null) : null;
 }
 
 export async function requireUser(...roles: Role[]): Promise<User> {

@@ -7,7 +7,7 @@ import { getLang, requireUser } from "@/lib/session";
 export default async function PriceApprovals() {
   await requireUser("exec");
   const t = makeT(await getLang());
-  const db = loadDb();
+  const db = (await loadDb());
   const sup = (id?: string) => db.suppliers.find((x) => x.id === id)?.name ?? "—";
   const pending = db.priceChanges.filter((c) => c.status === "pending");
   const history = db.priceChanges.filter((c) => c.status !== "pending").reverse();

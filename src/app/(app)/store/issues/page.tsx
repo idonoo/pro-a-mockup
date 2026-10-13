@@ -8,7 +8,7 @@ import { getLang, requireUser } from "@/lib/session";
 export default async function IssuesPage() {
   await requireUser("store");
   const t = makeT(await getLang());
-  const db = loadDb();
+  const db = (await loadDb());
   const list = db.orders.flatMap((o) => o.issues.filter((i) => i.status === "requested").map((i) => ({ o, i })));
   return (
     <>

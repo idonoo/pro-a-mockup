@@ -10,7 +10,7 @@ import { canSeeUnitCost, getLang, requireUser } from "@/lib/session";
 export default async function Store() {
   const user = await requireUser("store", "exec", "purchasing");
   const t = makeT(await getLang());
-  const db = loadDb();
+  const db = (await loadDb());
   const showCost = canSeeUnitCost(user.role); // the warehouse never sees prices
   const waiting = db.orders.filter((o) => o.status === "waiting_material");
   const shortage = Object.fromEntries(BOM_KEYS.map((k) => [k, r2(waiting.reduce((s, o) => s + (o.shortage?.[k] ?? 0), 0))]));

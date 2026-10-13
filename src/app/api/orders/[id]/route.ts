@@ -9,5 +9,5 @@ export async function PUT(req: Request, ctx: RouteContext<"/api/orders/[id]">) {
   if (!user) return unauthorized();
   const { id } = await ctx.params;
   const input = (await req.json()) as OrderInput;
-  return json(mutate((db) => resubmitOrder(db, user, id, input)));
+  return json(await mutate((db) => resubmitOrder(db, user, id, input)));
 }

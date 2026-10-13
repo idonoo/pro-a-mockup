@@ -6,7 +6,7 @@ import { getLang, homeFor } from "@/lib/session";
 
 export default async function LoginPage() {
   const t = makeT(await getLang());
-  const { users } = loadDb();
+  const { users } = (await loadDb());
   return (
     <main className="mx-auto max-w-5xl p-8">
       <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
